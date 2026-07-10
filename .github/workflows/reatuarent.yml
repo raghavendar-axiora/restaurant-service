@@ -71,6 +71,10 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+           # Verify Built Image
+      - name: Verify Built Image
+        run: |
+          docker images | grep bistro-${{ matrix.service }}
       # Publish Docker Image to Registry
       - name: Login to Docker Hub
         if: github.event_name == 'push'
