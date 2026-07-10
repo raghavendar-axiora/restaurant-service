@@ -15,6 +15,21 @@ env:
   EKS_CLUSTER_NAME: bistro-eks-cluster
 
 jobs:
+  # 0. Check secrets availability
+  check-secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      has_aws: ${{ steps.check_aws.outputs.has_aws }}
+    steps:
+      - name: Check AWS Secrets
+        id: check_aws
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "has_aws=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_aws=false" >> $GITHUB_OUTPUT
+          fi
+
   # 1. CI Pipeline: Test, Scan, Build and Publish Container Images
   ci-pipeline:
     runs-on: ubuntu-latest
@@ -101,9 +116,9 @@ jobs:
 
   # 2. CD Pipeline: Deploy to AWS Kubernetes (EKS) Cluster
   cd-pipeline:
-    needs: ci-pipeline
+    needs: [ci-pipeline, check-secrets]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.AWS_ACCESS_KEY_ID != ''
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check-secrets.outputs.has_aws == 'true'
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
