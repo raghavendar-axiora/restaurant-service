@@ -5,7 +5,6 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 env:
-  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
   DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME || 'bistrodev' }}
   DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -78,14 +77,12 @@ jobs:
           severity: 'CRITICAL,HIGH'
       # Publish Docker Image to Registry
       - name: Login to Docker Hub
-        if: github.event_name == 'push'
         if: github.event_name == 'push' && secrets.DOCKER_HUB_PASSWORD != ''
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       - name: Push Docker Image
-        if: github.event_name == 'push'
         if: github.event_name == 'push' && secrets.DOCKER_HUB_PASSWORD != ''
         run: |
           docker push $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:${{ github.sha }}
@@ -94,7 +91,6 @@ jobs:
   cd-pipeline:
     needs: ci-pipeline
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.AWS_ACCESS_KEY_ID != ''
     steps:
       - name: Checkout Code
