@@ -33,91 +33,6 @@ jobs:
   # 1. CI Pipeline: Test, Scan, Build and Publish Container Images
   ci-pipeline:
     runs-on: ubuntu-latest
-
-  # 2. CD Pipeline: Deploy to AWS Kubernetes (EKS) Cluster
-  cd-pipeline:
-    needs: ci-pipeline
-    needs: [ci-pipeline, check-secrets]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.AWS_ACCESS_KEY_ID != ''
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.check-secrets.outputs.has_aws == 'true'
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      # Setup AWS CLI & Kubeconfig
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Update Kubeconfig for EKS
-        run: |
-          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
-
-      # Deploy K8s resources using rolling updates
-      - name: Deploy Manifests to Kubernetes Cluster
-        run: |
-          cd ./restaurant-devops/kubernetes
-          kubectl apply -f configmap.yaml
-          kubectl apply -f secret.yaml
-          kubectl apply -f deployment.yaml
-          kubectl apply -f service.yaml
-          kubectl apply -f ingress.yaml
-
-      # Force rolling update to pull the newly built images
-      - name: Rollout Restart Deployments
-        run: |
-          kubectl rollout restart deployment/bistro-auth-service
-          kubectl rollout restart deployment/bistro-menu-service
-          kubectl rollout restart deployment/bistro-order-service
-          kubectl rollout restart deployment/bistro-payment-service
-          kubectl rollout restart deployment/bistro-notification-service
-          kubectl rollout restart deployment/bistro-report-service
-          kubectl rollout restart deployment/bistro-api-gateway
-          kubectl rollout restart deployment/bistro-frontend
-
-      # Verify Rollout Health (Smoke Test check)
-      - name: Verify Deployments Health
-        run: |
-          kubectl rollout status deployment/bistro-api-gateway --timeout=90s
-          kubectl rollout status deployment/bistro-frontend --timeout=90s
-name: Bistro Flux CI/CD Pipeline
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
-env:
-  DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME || 'bistrodev' }}
-  DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  AWS_REGION: us-east-1
-  EKS_CLUSTER_NAME: bistro-eks-cluster
-jobs:
-  # 0. Check secrets availability
-  check-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      has_aws: ${{ steps.check_aws.outputs.has_aws }}
-    steps:
-      - name: Check AWS Secrets
-        id: check_aws
-        run: |
-          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
-            echo "has_aws=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_aws=false" >> $GITHUB_OUTPUT
-          fi
-  # 1. CI Pipeline: Test, Scan, Build and Publish Container Images
-  ci-pipeline:
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         service: [
@@ -133,6 +48,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       # Setup Node environment for JS microservices
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -142,6 +58,7 @@ jobs:
           cache-dependency-path: './restaurant-devops/${{ matrix.service }}/package-lock.json'
         # Skip cache step if lockfile doesn't exist
         continue-on-error: true
+
       # Install & Test Service
       - name: Install dependencies & Run tests
         run: |
@@ -152,6 +69,7 @@ jobs:
           else
             echo "No test script found, skipping test phase."
           fi
+
       # Static Application Security Testing (SAST) via SonarCloud/SonarQube
       - name: SonarQube Scan
         uses: SonarSource/sonarcloud-github-action@master
@@ -159,15 +77,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         continue-on-error: true # Allow fallback if tokens are not configured in forks
+
       # Build Docker Image
       - name: Build Docker Image
         run: |
           docker build -t $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:${{ github.sha }} ./restaurant-devops/${{ matrix.service }}
           docker tag $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:${{ github.sha }} $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:latest
+
       # Verify Built Image
       - name: Verify Built Image
         run: |
           docker images | grep bistro-${{ matrix.service }} || true
+
       # Scan Docker Image for Vulnerabilities using Trivy
       - name: Scan Docker Image (Trivy)
         uses: aquasecurity/trivy-action@master
@@ -178,6 +99,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+
       # Publish Docker Image to Registry
       - name: Login to Docker Hub
         if: github.event_name == 'push' && env.DOCKER_HUB_PASSWORD != ''
@@ -185,11 +107,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
       - name: Push Docker Image
         if: github.event_name == 'push' && env.DOCKER_HUB_PASSWORD != ''
         run: |
           docker push $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:${{ github.sha }}
           docker push $DOCKER_HUB_USERNAME/bistro-${{ matrix.service }}:latest
+
   # 2. CD Pipeline: Deploy to AWS Kubernetes (EKS) Cluster
   cd-pipeline:
     needs: [ci-pipeline, check-secrets]
@@ -198,6 +122,7 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
       # Setup AWS CLI & Kubeconfig
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -205,11 +130,14 @@ jobs:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
+
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
+
       - name: Update Kubeconfig for EKS
         run: |
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
       # Deploy K8s resources using rolling updates
       - name: Deploy Manifests to Kubernetes Cluster
         run: |
@@ -219,6 +147,7 @@ jobs:
           kubectl apply -f deployment.yaml
           kubectl apply -f service.yaml
           kubectl apply -f ingress.yaml
+
       # Force rolling update to pull the newly built images
       - name: Rollout Restart Deployments
         run: |
@@ -230,6 +159,7 @@ jobs:
           kubectl rollout restart deployment/bistro-report-service
           kubectl rollout restart deployment/bistro-api-gateway
           kubectl rollout restart deployment/bistro-frontend
+
       # Verify Rollout Health (Smoke Test check)
       - name: Verify Deployments Health
         run: |
