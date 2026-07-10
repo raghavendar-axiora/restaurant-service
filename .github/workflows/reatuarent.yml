@@ -1,9 +1,9 @@
 name: Bistro Flux CI/CD Pipeline
 on:
   push:
-    branches: main
+    branches: [ "main", "master" ]
   pull_request:
-    branches: main 
+    branches: [ "main", "master" ]
 env:
   DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME || 'bistrodev' }}
   DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
