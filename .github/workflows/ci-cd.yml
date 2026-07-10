@@ -36,7 +36,6 @@ jobs:
 
   # 2. CD Pipeline: Deploy to AWS Kubernetes (EKS) Cluster
   cd-pipeline:
-    needs: ci-pipeline
     needs: [ci-pipeline, check-secrets]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.AWS_ACCESS_KEY_ID != ''
