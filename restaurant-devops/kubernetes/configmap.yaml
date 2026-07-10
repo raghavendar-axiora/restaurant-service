@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bistro-config
+  namespace: default
+data:
+  DATABASE_URL: "postgres://postgres:password@bistro-postgres-service:5432/bistro_db"
+  REDIS_URL: "redis://bistro-redis-service:6379"
+  RABBITMQ_URL: "amqp://guest:guest@bistro-rabbitmq-service:5672"
+  AUTH_SERVICE_URL: "http://bistro-auth-service:8081"
+  MENU_SERVICE_URL: "http://bistro-menu-service:8082"
+  ORDER_SERVICE_URL: "http://bistro-order-service:8083"
+  PAYMENT_SERVICE_URL: "http://bistro-payment-service:8084"
+  NOTIFICATION_SERVICE_URL: "http://bistro-notification-service:8085"
+  REPORT_SERVICE_URL: "http://bistro-report-service:8086"

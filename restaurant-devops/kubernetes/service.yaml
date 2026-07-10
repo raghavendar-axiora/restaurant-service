@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-postgres-service
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-redis-service
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-rabbitmq-service
+spec:
+  ports:
+  - name: amqp
+    port: 5672
+    targetPort: 5672
+  - name: management
+    port: 15672
+    targetPort: 15672
+  selector:
+    app: rabbitmq
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-auth-service
+spec:
+  ports:
+  - port: 8081
+    targetPort: 8081
+  selector:
+    app: auth-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-menu-service
+spec:
+  ports:
+  - port: 8082
+    targetPort: 8082
+  selector:
+    app: menu-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-order-service
+spec:
+  ports:
+  - port: 8083
+    targetPort: 8083
+  selector:
+    app: order-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-payment-service
+spec:
+  ports:
+  - port: 8084
+    targetPort: 8084
+  selector:
+    app: payment-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-notification-service
+spec:
+  ports:
+  - port: 8085
+    targetPort: 8085
+  selector:
+    app: notification-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-report-service
+spec:
+  ports:
+  - port: 8086
+    targetPort: 8086
+  selector:
+    app: report-service
+---
+# External entrypoints
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-api-gateway-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: api-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bistro-frontend-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: frontend

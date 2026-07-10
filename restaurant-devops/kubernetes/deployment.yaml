@@ -1,0 +1,408 @@
+# -------------------------------------------------------------
+# Databases Deployment (Postgres, Redis, RabbitMQ)
+# -------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_USER
+          value: postgres
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: bistro-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          value: bistro_db
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-rabbitmq
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3-management-alpine
+        ports:
+        - containerPort: 5672
+        - containerPort: 15672
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+
+---
+# -------------------------------------------------------------
+# Microservices Deployments (Auth, Menu, Order, Payment, etc.)
+# -------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-auth-service
+  labels:
+    app: auth-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: bistro-auth-service:latest
+        ports:
+        - containerPort: 8081
+        env:
+        - name: PORT
+          value: "8081"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: bistro-secrets
+              key: JWT_SECRET
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-menu-service
+  labels:
+    app: menu-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: menu-service
+  template:
+    metadata:
+      labels:
+        app: menu-service
+    spec:
+      containers:
+      - name: menu-service
+        image: bistro-menu-service:latest
+        ports:
+        - containerPort: 8082
+        env:
+        - name: PORT
+          value: "8082"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: REDIS_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-order-service
+  labels:
+    app: order-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: bistro-order-service:latest
+        ports:
+        - containerPort: 8083
+        env:
+        - name: PORT
+          value: "8083"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: DATABASE_URL
+        - name: RABBITMQ_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: RABBITMQ_URL
+        - name: PAYMENT_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: PAYMENT_SERVICE_URL
+        - name: NOTIFICATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: NOTIFICATION_SERVICE_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-payment-service
+  labels:
+    app: payment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+  template:
+    metadata:
+      labels:
+        app: payment-service
+    spec:
+      containers:
+      - name: payment-service
+        image: bistro-payment-service:latest
+        ports:
+        - containerPort: 8084
+        env:
+        - name: PORT
+          value: "8084"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: DATABASE_URL
+        - name: RABBITMQ_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: RABBITMQ_URL
+        - name: ORDER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: ORDER_SERVICE_URL
+        - name: NOTIFICATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: NOTIFICATION_SERVICE_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-notification-service
+  labels:
+    app: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: bistro-notification-service:latest
+        ports:
+        - containerPort: 8085
+        env:
+        - name: PORT
+          value: "8085"
+        - name: RABBITMQ_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: RABBITMQ_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-report-service
+  labels:
+    app: report-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-service
+  template:
+    metadata:
+      labels:
+        app: report-service
+    spec:
+      containers:
+      - name: report-service
+        image: bistro-report-service:latest
+        ports:
+        - containerPort: 8086
+        env:
+        - name: PORT
+          value: "8086"
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: DATABASE_URL
+        - name: ORDER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: ORDER_SERVICE_URL
+
+---
+# -------------------------------------------------------------
+# Gateway & Web Frontend Deployments
+# -------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-api-gateway
+  labels:
+    app: api-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: bistro-api-gateway:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: AUTH_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: AUTH_SERVICE_URL
+        - name: MENU_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: MENU_SERVICE_URL
+        - name: ORDER_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: ORDER_SERVICE_URL
+        - name: PAYMENT_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: PAYMENT_SERVICE_URL
+        - name: NOTIFICATION_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: NOTIFICATION_SERVICE_URL
+        - name: REPORT_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: bistro-config
+              key: REPORT_SERVICE_URL
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bistro-frontend
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: bistro-frontend:latest
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
