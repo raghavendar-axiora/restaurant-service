@@ -1,3 +1,4 @@
+name: Bistro Flux CI/CD Pipeline
 on:
   push:
     branches: [ "main", "master" ]
@@ -127,4 +128,3 @@ jobs:
         run: |
           kubectl rollout status deployment/bistro-api-gateway --timeout=90s
           kubectl rollout status deployment/bistro-frontend --timeout=90s
-
